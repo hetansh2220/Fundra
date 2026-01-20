@@ -1,4 +1,5 @@
 "use client";
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight } from "lucide-react"
@@ -53,7 +54,7 @@ export default function CampaignStories() {
   ]
 
   return (
-    <section className="py-20 bg-white">
+    <section className="py-20 bg-[#ccc5b0]">
       <div className="container mx-auto px-6">
         <div className="text-center mb-12">
           <p className="text-xs font-semibold text-gray-600 mb-3 tracking-wider">SUCCESS STORIES</p>
@@ -112,7 +113,7 @@ export default function CampaignStories() {
 
         {/* View All Stories Button */}
         <div className="text-center mt-12">
-          <Button variant="outline" className="border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white px-8 py-3 text-sm font-semibold rounded-full">
+          <Button variant="outline" className="border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white px-8 py-3 text-sm font-semibold rounded-xl">
             VIEW ALL STORIES
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>

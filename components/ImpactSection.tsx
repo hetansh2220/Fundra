@@ -1,7 +1,8 @@
 "use client";
+
 export default function ImpactSection() {
   return (
-    <section className="py-20 bg-[#f5f3e8]">
+    <section className="py-20 bg-gray-50">
       <div className="container mx-auto px-6">
         <div className="text-center mb-16">
           <p className="text-xs font-semibold text-gray-600 mb-3 tracking-wider">OUR IMPACT</p>

@@ -1,4 +1,5 @@
 "use client";
+
 import Navbar from "@/components/Navbar"
 import HeroSection from "@/components/HeroSection"
 import PartnersTicker from "@/components/PartnersTicker"
@@ -10,7 +11,7 @@ import Footer from "@/components/Footer"
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#f5f3e8]">
+    <div className="min-h-screen bg-white">
       <Navbar />
       <HeroSection />
       <PartnersTicker />

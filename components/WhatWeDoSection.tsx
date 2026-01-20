@@ -1,4 +1,5 @@
 "use client";
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Heart, Headphones, Users, ArrowRight } from "lucide-react"
@@ -12,18 +13,18 @@ export default function WhatWeDoSection() {
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
             Providing Hope And Help<br />During Challenging Times
           </h2>
-          <Button variant="outline" className="border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white px-6 py-2 text-xs font-semibold rounded-full">
+          <Button variant="outline" className="border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white px-6 py-2 text-xs font-semibold rounded-xl">
             LEARN MORE
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
         </div>
 
         {/* Cards Section */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto mt-16">
+        <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto mt-16 ">
           {/* Make a Donation Card */}
-          <Card className="bg-white border-2 border-gray-200 hover:shadow-lg transition">
+          <Card className="bg-white border-2 border-gray-200 hover:bg-[#ccc5b0] transition rounded-xl">
             <CardContent className="p-6">
-              <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center mb-4">
+              <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center mb-4">
                 <Heart className="w-5 h-5 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Make a Donation</h3>
@@ -51,9 +52,9 @@ export default function WhatWeDoSection() {
           </Card>
 
           {/* Get Support Card */}
-          <Card className="bg-white border-2 border-gray-200 hover:shadow-lg transition">
+          <Card className="bg-white border-2 border-gray-200 hover:bg-[#ccc5b0] transition rounded-xl">
             <CardContent className="p-6">
-              <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center mb-4">
+              <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center mb-4">
                 <Headphones className="w-5 h-5 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Get Support</h3>
@@ -73,9 +74,9 @@ export default function WhatWeDoSection() {
           </Card>
 
           {/* Become a Volunteer Card */}
-          <Card className="bg-white border-2 border-gray-200 hover:shadow-lg transition">
+          <Card className="bg-white border-2 border-gray-200 hover:bg-[#ccc5b0] transition rounded-xl">
             <CardContent className="p-6">
-              <div className="w-10 h-10 bg-gray-900 rounded-full flex items-center justify-center mb-4">
+              <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center mb-4">
                 <Users className="w-5 h-5 text-white" />
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-3">Become a Volunteer</h3>

@@ -1,4 +1,5 @@
 "use client";
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ArrowRight, Heart } from "lucide-react"
