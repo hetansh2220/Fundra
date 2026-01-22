@@ -1,10 +1,12 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import LoginWithEmail from '@/components/privy-button';
 
 export default function Navbar() {
+
+
     return (
         <motion.header
             initial={{ opacity: 0, y: -20 }}
@@ -13,7 +15,6 @@ export default function Navbar() {
             className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border"
         >
             <div className="max-w-8xl mx-auto px-6 py-6 flex items-center justify-between">
-                {/* Logo */}
                 <motion.div
                     whileHover={{ scale: 1.05 }}
                     className="flex items-center gap-2 cursor-pointer"
@@ -21,7 +22,6 @@ export default function Navbar() {
                     <span className="font-bold text-xl tracking-wider">HOPE RISE</span>
                 </motion.div>
 
-                {/* Navigation */}
                 <nav className="hidden md:flex items-center gap-8 ">
                     {['Explore', 'Create campaign'].map(
                         (item) => (
@@ -37,13 +37,8 @@ export default function Navbar() {
                     )}
                 </nav>
 
-                {/* Right Actions */}
                 <div className="flex items-center gap-4">
-                    <Button
-                        className="bg-green-400 hover:bg-accent/90 text-black  font-semibold text-sm px-6 rounded-full"
-                    >
-                        Wallet Connect
-                    </Button>
+                   
                 </div>
             </div>
         </motion.header>
