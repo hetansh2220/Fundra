@@ -1,36 +1,31 @@
 'use client';
 
-import { PrivyProvider } from '@privy-io/react-auth';
-import { ThemeProvider, useTheme } from 'next-themes';
+import { useMemo } from 'react';
+import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
+import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  TorusWalletAdapter,
+  LedgerWalletAdapter,
+} from '@solana/wallet-adapter-wallets';
+import { ThemeProvider } from 'next-themes';
 
-function PrivyProviderWrapper({ children }: { children: React.ReactNode }) {
-  const { resolvedTheme } = useTheme();
+import '@solana/wallet-adapter-react-ui/styles.css';
 
-  return (
-    <PrivyProvider
-      appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID!}
-      clientId={process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID!}
-      config={{
-        loginMethods: ['email'],
-        appearance: {
-          theme: resolvedTheme === 'dark' ? 'dark' : 'light',
-          accentColor: '#059669',
-          logo: undefined,
-          walletChainType: 'solana-only',
-        },
-        embeddedWallets: {
-          solana: {
-            createOnLogin: 'all-users',
-          },
-        },
-      }}
-    >
-      {children}
-    </PrivyProvider>
-  );
-}
+const SOLANA_RPC = process.env.NEXT_PUBLIC_SOLANA_RPC || 'https://api.devnet.solana.com';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new TorusWalletAdapter(),
+      new LedgerWalletAdapter(),
+    ],
+    []
+  );
+
   return (
     <ThemeProvider
       attribute="class"
@@ -38,7 +33,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <PrivyProviderWrapper>{children}</PrivyProviderWrapper>
+      <ConnectionProvider endpoint={SOLANA_RPC}>
+        <WalletProvider wallets={wallets} autoConnect>
+          <WalletModalProvider>{children}</WalletModalProvider>
+        </WalletProvider>
+      </ConnectionProvider>
     </ThemeProvider>
   );
 }

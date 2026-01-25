@@ -11,19 +11,30 @@ import {
   CheckCircle2,
   ExternalLink,
   Twitter,
-  MessageCircle,
   Copy,
-  Wallet
+  Wallet,
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import Navbar from '@/components/landing-page/Navbar'
-import { usePrivy } from '@privy-io/react-auth'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
+import { useHopeRise, type Campaign, type Milestone } from '@/lib/hooks/useHopeRise'
+import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { ipfsToHttp } from '@/lib/ipfs'
 
-// Mock data - in production this would come from your backend/blockchain
-const campaignsData: Record<string, {
+const fundingTiers = [
+  { amount: 0.1, label: 'Supporter', description: 'Show your support for this cause' },
+  { amount: 0.5, label: 'Backer', description: 'Get exclusive project updates' },
+  { amount: 1, label: 'Champion', description: 'Your name on the donor wall' },
+  { amount: 5, label: 'Hero', description: 'VIP access + all previous rewards' },
+]
+
+interface DisplayCampaign {
   id: string
   title: string
   description: string
@@ -38,94 +49,143 @@ const campaignsData: Record<string, {
   updates: { date: string; title: string; content: string }[]
   milestones: { title: string; amount: number; completed: boolean }[]
   faqs: { question: string; answer: string }[]
-}> = {
-  '1': {
-    id: '1',
-    title: 'Solar-Powered Water Purification',
-    description: 'Bringing clean drinking water to rural communities using sustainable solar technology.',
-    longDescription: `Our mission is to provide clean, safe drinking water to communities that lack access to reliable water sources. Using innovative solar-powered purification technology, we can process up to 10,000 liters of water per day without relying on grid electricity.
-
-This project will directly benefit over 10,000 families in rural areas where water-borne diseases are a leading cause of illness. Our solution is sustainable, low-maintenance, and designed to last for 15+ years.
-
-**What makes this different?**
-- 100% solar-powered, zero ongoing energy costs
-- Removes 99.9% of harmful bacteria and contaminants
-- Local community ownership and operation
-- Creates 50+ jobs in installation and maintenance
-
-**How funds will be used:**
-- 40% - Equipment and materials
-- 30% - Installation and logistics
-- 20% - Training and community education
-- 10% - Ongoing maintenance fund`,
-    raised: 45000,
-    goal: 60000,
-    backers: 892,
-    daysLeft: 12,
-    category: 'Environment',
-    creator: 'GreenFuture DAO',
-    creatorWallet: '7xKX...3nPq',
-    updates: [
-      { date: '2024-01-15', title: 'Equipment Ordered!', content: 'We have placed the order for the first batch of solar panels and purification units.' },
-      { date: '2024-01-08', title: 'Community Partnership', content: 'Signed MOU with three villages for the initial deployment phase.' },
-    ],
-    milestones: [
-      { title: 'Initial Funding', amount: 15000, completed: true },
-      { title: 'Equipment Purchase', amount: 30000, completed: true },
-      { title: 'Installation Phase', amount: 45000, completed: false },
-      { title: 'Full Deployment', amount: 60000, completed: false },
-    ],
-    faqs: [
-      { question: 'How long will installation take?', answer: 'We expect the full installation to take 3-4 months after reaching our funding goal.' },
-      { question: 'Can I visit the project site?', answer: 'Yes! We organize quarterly visits for major backers. Contact us for details.' },
-    ],
-  },
+  publicKey: PublicKey
+  coverImageUrl?: string
 }
-
-// Default campaign data for IDs not in our mock data
-const defaultCampaign = {
-  id: '0',
-  title: 'Campaign Not Found',
-  description: 'This campaign does not exist or has been removed.',
-  longDescription: 'Please check the URL and try again.',
-  raised: 0,
-  goal: 100000,
-  backers: 0,
-  daysLeft: 0,
-  category: 'Unknown',
-  creator: 'Unknown',
-  creatorWallet: '0x...',
-  updates: [],
-  milestones: [],
-  faqs: [],
-}
-
-const fundingTiers = [
-  { amount: 10, label: 'Supporter', description: 'Show your support for this cause' },
-  { amount: 50, label: 'Backer', description: 'Get exclusive project updates' },
-  { amount: 100, label: 'Champion', description: 'Your name on the donor wall' },
-  { amount: 500, label: 'Hero', description: 'VIP access + all previous rewards' },
-]
 
 export default function CampaignDetailPage() {
   const params = useParams()
   const id = params.id as string
-  const campaign = campaignsData[id] || defaultCampaign
 
-  const { login, authenticated, user } = usePrivy()
+  const { connected } = useWallet()
+  const { fetchCampaign, fetchMilestones, fundCampaign, loading, publicKey } = useHopeRise()
+
+  const [campaign, setCampaign] = useState<DisplayCampaign | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [selectedTier, setSelectedTier] = useState<number | null>(null)
   const [customAmount, setCustomAmount] = useState('')
   const [activeTab, setActiveTab] = useState<'about' | 'updates' | 'faq'>('about')
+  const [isFunding, setIsFunding] = useState(false)
+  const [fundingError, setFundingError] = useState<string | null>(null)
+  const [fundingSuccess, setFundingSuccess] = useState(false)
 
-  const progress = (campaign.raised / campaign.goal) * 100
+  // Load campaign data from blockchain
+  useEffect(() => {
+    const loadCampaign = async () => {
+      setIsLoading(true)
 
-  const handleFund = () => {
-    if (!authenticated) {
-      login()
+      try {
+        const pubkey = new PublicKey(id)
+        const blockchainCampaign = await fetchCampaign(pubkey)
+
+        if (blockchainCampaign) {
+          const now = Math.floor(Date.now() / 1000)
+          const milestones = await fetchMilestones(pubkey)
+
+          setCampaign({
+            id: blockchainCampaign.publicKey.toString(),
+            title: blockchainCampaign.title,
+            description: blockchainCampaign.shortDescription,
+            longDescription: `Campaign created on Hope Rise blockchain platform.\n\nFunding Goal: ${(blockchainCampaign.fundingGoal / LAMPORTS_PER_SOL).toFixed(2)} SOL\nAmount Raised: ${(blockchainCampaign.amountRaised / LAMPORTS_PER_SOL).toFixed(2)} SOL\n\nThis campaign is stored on the Solana blockchain and all contributions are transparent and verifiable.`,
+            raised: blockchainCampaign.amountRaised / LAMPORTS_PER_SOL,
+            goal: blockchainCampaign.fundingGoal / LAMPORTS_PER_SOL,
+            backers: blockchainCampaign.backerCount,
+            daysLeft: Math.max(0, Math.floor((blockchainCampaign.deadline - now) / 86400)),
+            category: blockchainCampaign.category,
+            creator: blockchainCampaign.creator.toString().slice(0, 4) + '...' + blockchainCampaign.creator.toString().slice(-4),
+            creatorWallet: blockchainCampaign.creator.toString(),
+            updates: [],
+            milestones: milestones.map(m => ({
+              title: m.title,
+              amount: m.targetAmount / LAMPORTS_PER_SOL,
+              completed: m.isCompleted,
+            })),
+            faqs: [],
+            publicKey: blockchainCampaign.publicKey,
+            coverImageUrl: blockchainCampaign.coverImageUrl,
+          })
+        } else {
+          setCampaign(null)
+        }
+      } catch (err) {
+        console.error('Failed to fetch campaign:', err)
+        setCampaign(null)
+      }
+
+      setIsLoading(false)
+    }
+
+    loadCampaign()
+  }, [id, fetchCampaign, fetchMilestones])
+
+  const progress = campaign ? (campaign.raised / campaign.goal) * 100 : 0
+
+  const handleFund = async () => {
+    if (!connected || !campaign) {
       return
     }
-    // Handle funding logic here
-    console.log('Funding with amount:', selectedTier || customAmount)
+
+    const amount = selectedTier || Number(customAmount)
+    if (!amount || amount <= 0) return
+
+    setIsFunding(true)
+    setFundingError(null)
+
+    try {
+      await fundCampaign(campaign.publicKey, amount)
+      setFundingSuccess(true)
+      setSelectedTier(null)
+      setCustomAmount('')
+
+      // Refresh campaign data
+      const updatedCampaign = await fetchCampaign(campaign.publicKey)
+      if (updatedCampaign) {
+        setCampaign(prev => prev ? {
+          ...prev,
+          raised: updatedCampaign.amountRaised / LAMPORTS_PER_SOL,
+          backers: updatedCampaign.backerCount,
+        } : null)
+      }
+
+      setTimeout(() => setFundingSuccess(false), 5000)
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to fund campaign'
+      setFundingError(message)
+    } finally {
+      setIsFunding(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-32 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-hope" />
+          <span className="ml-3 text-muted-foreground">Loading campaign...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!campaign) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Navbar />
+        <div className="pt-32 px-6">
+          <div className="max-w-md mx-auto text-center">
+            <AlertCircle className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+            <h1 className="font-display text-2xl font-bold mb-2">Campaign Not Found</h1>
+            <p className="text-muted-foreground mb-6">This campaign does not exist or has been removed.</p>
+            <Link href="/explore">
+              <Button className="bg-hope text-black hover:bg-hope/90">
+                Explore Campaigns
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -155,8 +215,19 @@ export default function CampaignDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="relative h-64 md:h-96 bg-gradient-to-br from-secondary to-muted rounded-2xl overflow-hidden"
               >
-                <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-                <div className="absolute top-4 right-4">
+                {campaign.coverImageUrl && ipfsToHttp(campaign.coverImageUrl) ? (
+                  <img
+                    src={ipfsToHttp(campaign.coverImageUrl)}
+                    alt={campaign.title}
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+                )}
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <span className="px-3 py-1 bg-hope/90 text-black text-xs font-bold rounded-full">
+                    On-Chain
+                  </span>
                   <span className="px-4 py-2 bg-background/90 backdrop-blur-sm text-sm font-medium rounded-full border border-border">
                     {campaign.category}
                   </span>
@@ -164,7 +235,7 @@ export default function CampaignDetailPage() {
                 <div className="absolute bottom-6 left-6 right-6">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-hope/20 rounded-full flex items-center justify-center">
-                      <span className="text-hope font-bold">GF</span>
+                      <span className="text-hope font-bold">{campaign.creator.slice(0, 2).toUpperCase()}</span>
                     </div>
                     <div>
                       <p className="text-sm text-white/70">Created by</p>
@@ -272,10 +343,10 @@ export default function CampaignDetailPage() {
                 <div className="mb-6">
                   <div className="flex items-baseline justify-between mb-2">
                     <span className="font-display text-3xl font-bold text-hope">
-                      ${campaign.raised.toLocaleString()}
+                      {campaign.raised.toFixed(2)} SOL
                     </span>
                     <span className="text-muted-foreground">
-                      of ${campaign.goal.toLocaleString()}
+                      of {campaign.goal.toFixed(2)} SOL
                     </span>
                   </div>
                   <div className="h-3 bg-secondary rounded-full overflow-hidden mb-4">
@@ -302,9 +373,31 @@ export default function CampaignDetailPage() {
                   </div>
                 </div>
 
+                {/* Success message */}
+                {fundingSuccess && (
+                  <div className="mb-4 p-3 bg-hope/10 border border-hope/20 rounded-xl">
+                    <div className="flex items-center gap-2 text-hope">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span className="text-sm font-medium">Thank you for your contribution!</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error message */}
+                {fundingError && (
+                  <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-xl">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="text-sm">{fundingError}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Funding tiers */}
                 <div className="space-y-3 mb-6">
-                  <p className="text-sm font-medium text-muted-foreground">Select amount</p>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Select amount (SOL)
+                  </p>
                   <div className="grid grid-cols-2 gap-2">
                     {fundingTiers.map((tier) => (
                       <button
@@ -316,7 +409,7 @@ export default function CampaignDetailPage() {
                             : 'border-border hover:border-hope/50'
                         }`}
                       >
-                        <p className="font-semibold">${tier.amount}</p>
+                        <p className="font-semibold">{tier.amount} SOL</p>
                         <p className="text-xs text-muted-foreground">{tier.label}</p>
                       </button>
                     ))}
@@ -324,26 +417,41 @@ export default function CampaignDetailPage() {
 
                   {/* Custom amount */}
                   <div className="relative">
-                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      SOL
+                    </span>
                     <input
                       type="number"
                       placeholder="Custom amount"
                       value={customAmount}
                       onChange={(e) => { setCustomAmount(e.target.value); setSelectedTier(null); }}
-                      className="w-full pl-8 pr-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-hope/50"
+                      className="w-full pl-12 pr-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-hope/50"
                     />
                   </div>
                 </div>
 
                 {/* Fund button */}
-                <Button
-                  onClick={handleFund}
-                  className="w-full py-6 rounded-xl text-lg font-semibold bg-hope text-black hover:bg-hope/90 glow-hope mb-4"
-                  disabled={!selectedTier && !customAmount}
-                >
-                  <Wallet className="w-5 h-5 mr-2" />
-                  {authenticated ? 'Fund This Project' : 'Connect Wallet to Fund'}
-                </Button>
+                {connected ? (
+                  <Button
+                    onClick={handleFund}
+                    className="w-full py-6 rounded-xl text-lg font-semibold bg-hope text-black hover:bg-hope/90 glow-hope mb-4"
+                    disabled={(!selectedTier && !customAmount) || isFunding}
+                  >
+                    {isFunding ? (
+                      <>
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Wallet className="w-5 h-5 mr-2" />
+                        Fund This Project
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <WalletMultiButton className="!w-full !py-6 !rounded-xl !text-lg !font-semibold !bg-hope !text-black hover:!bg-hope/90 !justify-center !mb-4" />
+                )}
 
                 {/* Share buttons */}
                 <div className="flex items-center justify-center gap-3">
@@ -362,49 +470,57 @@ export default function CampaignDetailPage() {
                 </div>
 
                 {/* Milestones */}
-                <div className="mt-6 pt-6 border-t border-border">
-                  <p className="text-sm font-medium mb-4 flex items-center gap-2">
-                    <Target className="w-4 h-4 text-hope" />
-                    Funding Milestones
-                  </p>
-                  <div className="space-y-3">
-                    {campaign.milestones.map((milestone, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          milestone.completed ? 'bg-hope/20' : 'bg-secondary'
-                        }`}>
-                          {milestone.completed ? (
-                            <CheckCircle2 className="w-4 h-4 text-hope" />
-                          ) : (
-                            <span className="text-xs text-muted-foreground">{i + 1}</span>
-                          )}
+                {campaign.milestones.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-border">
+                    <p className="text-sm font-medium mb-4 flex items-center gap-2">
+                      <Target className="w-4 h-4 text-hope" />
+                      Funding Milestones
+                    </p>
+                    <div className="space-y-3">
+                      {campaign.milestones.map((milestone, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            milestone.completed ? 'bg-hope/20' : 'bg-secondary'
+                          }`}>
+                            {milestone.completed ? (
+                              <CheckCircle2 className="w-4 h-4 text-hope" />
+                            ) : (
+                              <span className="text-xs text-muted-foreground">{i + 1}</span>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`text-sm ${milestone.completed ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {milestone.title}
+                            </p>
+                          </div>
+                          <span className={`text-sm ${milestone.completed ? 'text-hope' : 'text-muted-foreground'}`}>
+                            {milestone.amount.toFixed(2)} SOL
+                          </span>
                         </div>
-                        <div className="flex-1">
-                          <p className={`text-sm ${milestone.completed ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            {milestone.title}
-                          </p>
-                        </div>
-                        <span className={`text-sm ${milestone.completed ? 'text-hope' : 'text-muted-foreground'}`}>
-                          ${milestone.amount.toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Creator info */}
                 <div className="mt-6 pt-6 border-t border-border">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-hope/20 rounded-full flex items-center justify-center">
-                      <span className="text-hope font-bold text-sm">GF</span>
+                      <span className="text-hope font-bold text-sm">{campaign.creator.slice(0, 2).toUpperCase()}</span>
                     </div>
                     <div className="flex-1">
                       <p className="font-semibold text-sm">{campaign.creator}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{campaign.creatorWallet}</p>
+                      <p className="text-xs text-muted-foreground font-mono truncate">{campaign.creatorWallet}</p>
                     </div>
-                    <Button variant="ghost" size="sm" className="rounded-full">
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
+                    <a
+                      href={`https://explorer.solana.com/address/${campaign.creatorWallet}?cluster=devnet`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="ghost" size="sm" className="rounded-full">
+                        <ExternalLink className="w-4 h-4" />
+                      </Button>
+                    </a>
                   </div>
                 </div>
               </motion.div>

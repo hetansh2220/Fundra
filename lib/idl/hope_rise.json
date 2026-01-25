@@ -1,0 +1,1087 @@
+{
+  "address": "8zeHBfNfVkHQcWpJH9HRnR8NoEfrW6zSGqmZvBMWeCkd",
+  "metadata": {
+    "name": "hope_rise",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Solana smart contract for Hope Rise crowdfunding platform"
+  },
+  "instructions": [
+    {
+      "name": "add_milestone",
+      "docs": [
+        "Add a milestone to a campaign"
+      ],
+      "discriminator": [
+        165,
+        18,
+        177,
+        128,
+        204,
+        172,
+        23,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "milestone",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "campaign"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "target_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "claim_refund",
+      "docs": [
+        "Claim refund if campaign failed (goal not met)"
+      ],
+      "discriminator": [
+        15,
+        16,
+        30,
+        161,
+        255,
+        228,
+        97,
+        60
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contribution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  105,
+                  98,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign"
+              },
+              {
+                "kind": "account",
+                "path": "contributor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contributor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "close_campaign",
+      "docs": [
+        "Close a campaign"
+      ],
+      "discriminator": [
+        65,
+        49,
+        110,
+        7,
+        63,
+        238,
+        206,
+        77
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "campaign"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "complete_milestone",
+      "docs": [
+        "Mark a milestone as complete"
+      ],
+      "discriminator": [
+        137,
+        164,
+        160,
+        100,
+        33,
+        64,
+        178,
+        10
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "milestone",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "signer": true,
+          "relations": [
+            "campaign"
+          ]
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_campaign",
+      "docs": [
+        "Create a new crowdfunding campaign"
+      ],
+      "discriminator": [
+        111,
+        131,
+        187,
+        98,
+        160,
+        193,
+        114,
+        244
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "creator"
+              },
+              {
+                "kind": "account",
+                "path": "campaign_counter.count",
+                "account": "CampaignCounter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "campaign_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "title",
+          "type": "string"
+        },
+        {
+          "name": "short_description",
+          "type": "string"
+        },
+        {
+          "name": "category",
+          "type": {
+            "defined": {
+              "name": "Category"
+            }
+          }
+        },
+        {
+          "name": "cover_image_url",
+          "type": "string"
+        },
+        {
+          "name": "story_url",
+          "type": "string"
+        },
+        {
+          "name": "funding_goal",
+          "type": "u64"
+        },
+        {
+          "name": "duration_days",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "fund_campaign",
+      "docs": [
+        "Contribute SOL to a campaign"
+      ],
+      "discriminator": [
+        109,
+        57,
+        56,
+        239,
+        99,
+        111,
+        221,
+        121
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contribution",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  105,
+                  98,
+                  117,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign"
+              },
+              {
+                "kind": "account",
+                "path": "contributor"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contributor",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Initialize the global campaign counter (one-time setup)"
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "campaign_counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdraw_funds",
+      "docs": [
+        "Withdraw funds (creator only, after goal met)"
+      ],
+      "discriminator": [
+        241,
+        36,
+        29,
+        111,
+        208,
+        31,
+        104,
+        217
+      ],
+      "accounts": [
+        {
+          "name": "campaign",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  97,
+                  109,
+                  112,
+                  97,
+                  105,
+                  103,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "campaign.creator",
+                "account": "Campaign"
+              },
+              {
+                "kind": "account",
+                "path": "campaign.campaign_id",
+                "account": "Campaign"
+              }
+            ]
+          }
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "campaign"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Campaign",
+      "discriminator": [
+        50,
+        40,
+        49,
+        11,
+        157,
+        220,
+        229,
+        192
+      ]
+    },
+    {
+      "name": "CampaignCounter",
+      "discriminator": [
+        166,
+        204,
+        173,
+        116,
+        178,
+        217,
+        1,
+        210
+      ]
+    },
+    {
+      "name": "Contribution",
+      "discriminator": [
+        182,
+        187,
+        14,
+        111,
+        72,
+        167,
+        242,
+        212
+      ]
+    },
+    {
+      "name": "Milestone",
+      "discriminator": [
+        38,
+        210,
+        239,
+        177,
+        85,
+        184,
+        10,
+        44
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "You are not authorized to perform this action"
+    },
+    {
+      "code": 6001,
+      "name": "CampaignNotActive",
+      "msg": "Campaign is not active"
+    },
+    {
+      "code": 6002,
+      "name": "CampaignStillActive",
+      "msg": "Campaign is still active"
+    },
+    {
+      "code": 6003,
+      "name": "CampaignEnded",
+      "msg": "Campaign has ended"
+    },
+    {
+      "code": 6004,
+      "name": "CampaignNotEnded",
+      "msg": "Campaign has not ended yet"
+    },
+    {
+      "code": 6005,
+      "name": "GoalWasMet",
+      "msg": "Funding goal was already met"
+    },
+    {
+      "code": 6006,
+      "name": "GoalNotMet",
+      "msg": "Funding goal was not met"
+    },
+    {
+      "code": 6007,
+      "name": "WithdrawalNotAllowed",
+      "msg": "Withdrawal is not allowed at this time"
+    },
+    {
+      "code": 6008,
+      "name": "RefundAlreadyClaimed",
+      "msg": "Refund has already been claimed"
+    },
+    {
+      "code": 6009,
+      "name": "NoContribution",
+      "msg": "No contribution found to refund"
+    },
+    {
+      "code": 6010,
+      "name": "MilestoneAlreadyCompleted",
+      "msg": "Milestone has already been completed"
+    },
+    {
+      "code": 6011,
+      "name": "MilestoneTargetNotReached",
+      "msg": "Milestone target amount has not been reached"
+    },
+    {
+      "code": 6012,
+      "name": "MaxMilestonesReached",
+      "msg": "Maximum number of milestones (10) reached"
+    },
+    {
+      "code": 6013,
+      "name": "TitleTooLong",
+      "msg": "Title exceeds maximum length of 80 characters"
+    },
+    {
+      "code": 6014,
+      "name": "DescriptionTooLong",
+      "msg": "Description exceeds maximum length of 200 characters"
+    },
+    {
+      "code": 6015,
+      "name": "UrlTooLong",
+      "msg": "URL exceeds maximum length of 200 characters"
+    },
+    {
+      "code": 6016,
+      "name": "MilestoneTitleTooLong",
+      "msg": "Milestone title exceeds maximum length of 100 characters"
+    },
+    {
+      "code": 6017,
+      "name": "InvalidFundingGoal",
+      "msg": "Funding goal must be greater than zero"
+    },
+    {
+      "code": 6018,
+      "name": "InvalidContributionAmount",
+      "msg": "Contribution amount must be greater than zero"
+    },
+    {
+      "code": 6019,
+      "name": "InvalidDuration",
+      "msg": "Campaign duration must be between 1 and 90 days"
+    },
+    {
+      "code": 6020,
+      "name": "ArithmeticOverflow",
+      "msg": "Arithmetic overflow occurred"
+    },
+    {
+      "code": 6021,
+      "name": "InsufficientFunds",
+      "msg": "Insufficient funds in campaign account"
+    }
+  ],
+  "types": [
+    {
+      "name": "Campaign",
+      "docs": [
+        "Main campaign account storing all campaign data"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "campaign_id",
+            "docs": [
+              "Unique campaign identifier"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "creator",
+            "docs": [
+              "Campaign creator's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "title",
+            "docs": [
+              "Campaign title (max 80 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "short_description",
+            "docs": [
+              "Short description (max 200 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "category",
+            "docs": [
+              "Campaign category"
+            ],
+            "type": {
+              "defined": {
+                "name": "Category"
+              }
+            }
+          },
+          {
+            "name": "cover_image_url",
+            "docs": [
+              "IPFS hash for cover image"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "story_url",
+            "docs": [
+              "IPFS hash for long story content"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "funding_goal",
+            "docs": [
+              "Target funding goal in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "deadline",
+            "docs": [
+              "Campaign deadline (Unix timestamp)"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "amount_raised",
+            "docs": [
+              "Total amount raised in lamports"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "backer_count",
+            "docs": [
+              "Number of unique backers"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "is_active",
+            "docs": [
+              "Whether campaign is active"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "docs": [
+              "Creation timestamp"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "milestone_count",
+            "docs": [
+              "Number of milestones added"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CampaignCounter",
+      "docs": [
+        "Global campaign counter for generating unique campaign IDs"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "count",
+            "docs": [
+              "Total number of campaigns created"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "authority",
+            "docs": [
+              "Authority that initialized the program"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Category",
+      "docs": [
+        "Campaign category enum matching frontend categories"
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Environment"
+          },
+          {
+            "name": "Education"
+          },
+          {
+            "name": "Healthcare"
+          },
+          {
+            "name": "Technology"
+          },
+          {
+            "name": "Community"
+          },
+          {
+            "name": "Arts"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Contribution",
+      "docs": [
+        "Contribution account tracking individual backer contributions"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "campaign",
+            "docs": [
+              "Reference to campaign"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "contributor",
+            "docs": [
+              "Contributor's wallet address"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "docs": [
+              "Total amount contributed (in lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "contributed_at",
+            "docs": [
+              "Timestamp of first contribution"
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "refund_claimed",
+            "docs": [
+              "Whether refund has been claimed"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Milestone",
+      "docs": [
+        "Milestone account linked to a campaign"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "campaign",
+            "docs": [
+              "Reference to parent campaign"
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "milestone_index",
+            "docs": [
+              "Milestone index (0-based)"
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "title",
+            "docs": [
+              "Milestone title (max 100 characters)"
+            ],
+            "type": "string"
+          },
+          {
+            "name": "target_amount",
+            "docs": [
+              "Target amount for this milestone (in lamports)"
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "is_completed",
+            "docs": [
+              "Whether milestone is completed"
+            ],
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "docs": [
+              "PDA bump"
+            ],
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

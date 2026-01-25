@@ -1,112 +1,16 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { Search, Filter, TrendingUp, Clock, Users, ArrowUpRight, Sparkles } from 'lucide-react'
+import { Search, Filter, TrendingUp, Clock, Users, ArrowUpRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from '@/components/landing-page/Navbar'
+import { useHopeRise, type Campaign } from '@/lib/hooks/useHopeRise'
+import { LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { ipfsToHttp } from '@/lib/ipfs'
 
 const categories = ['All', 'Environment', 'Education', 'Healthcare', 'Technology', 'Community', 'Arts']
-
-const campaigns = [
-  {
-    id: '1',
-    title: 'Solar-Powered Water Purification',
-    description: 'Bringing clean drinking water to rural communities using sustainable solar technology.',
-    raised: 45000,
-    goal: 60000,
-    backers: 892,
-    daysLeft: 12,
-    category: 'Environment',
-    creator: 'GreenFuture DAO',
-    featured: true,
-  },
-  {
-    id: '2',
-    title: 'Open Source Education Platform',
-    description: 'Building a free, decentralized learning platform accessible to students worldwide.',
-    raised: 28500,
-    goal: 40000,
-    backers: 456,
-    daysLeft: 21,
-    category: 'Education',
-    creator: 'EduChain Collective',
-    featured: false,
-  },
-  {
-    id: '3',
-    title: 'Community Health Clinic',
-    description: 'Establishing a mobile health clinic for underserved neighborhoods in urban areas.',
-    raised: 72000,
-    goal: 85000,
-    backers: 1203,
-    daysLeft: 5,
-    category: 'Healthcare',
-    creator: 'HealthFirst Initiative',
-    featured: true,
-  },
-  {
-    id: '4',
-    title: 'Decentralized Art Gallery',
-    description: 'Creating a virtual gallery to showcase and sell digital art from emerging artists.',
-    raised: 15000,
-    goal: 25000,
-    backers: 234,
-    daysLeft: 30,
-    category: 'Arts',
-    creator: 'ArtBlock Studios',
-    featured: false,
-  },
-  {
-    id: '5',
-    title: 'AI-Powered Crop Monitoring',
-    description: 'Developing affordable drone technology for small-scale farmers to monitor crop health.',
-    raised: 38000,
-    goal: 50000,
-    backers: 567,
-    daysLeft: 18,
-    category: 'Technology',
-    creator: 'AgriTech Labs',
-    featured: false,
-  },
-  {
-    id: '6',
-    title: 'Youth Coding Bootcamp',
-    description: 'Free coding workshops for underprivileged youth in developing countries.',
-    raised: 22000,
-    goal: 30000,
-    backers: 389,
-    daysLeft: 25,
-    category: 'Education',
-    creator: 'CodeForAll',
-    featured: true,
-  },
-  {
-    id: '7',
-    title: 'Ocean Cleanup Initiative',
-    description: 'Deploying autonomous boats to collect plastic waste from coastal waters.',
-    raised: 95000,
-    goal: 120000,
-    backers: 1876,
-    daysLeft: 8,
-    category: 'Environment',
-    creator: 'BlueOcean DAO',
-    featured: false,
-  },
-  {
-    id: '8',
-    title: 'Mental Health App',
-    description: 'Building a free, privacy-focused mental health support application.',
-    raised: 18500,
-    goal: 35000,
-    backers: 312,
-    daysLeft: 45,
-    category: 'Healthcare',
-    creator: 'MindWell Labs',
-    featured: false,
-  },
-]
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -123,19 +27,40 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   },
 }
 
-function CampaignCard({ campaign }: { campaign: typeof campaigns[0] }) {
+interface DisplayCampaign {
+  id: string;
+  title: string;
+  description: string;
+  raised: number;
+  goal: number;
+  backers: number;
+  daysLeft: number;
+  category: string;
+  creator: string;
+  featured: boolean;
+  publicKey: string;
+  coverImageUrl?: string;
+}
+
+function CampaignCard({ campaign }: { campaign: DisplayCampaign }) {
   const progress = (campaign.raised / campaign.goal) * 100
+  const imageUrl = campaign.coverImageUrl ? ipfsToHttp(campaign.coverImageUrl) : ''
 
   return (
     <motion.div variants={itemVariants} whileHover={{ y: -6 }} className="group">
-      <Link href={`/campaigns/${campaign.id}`}>
+      <Link href={`/campaigns/${campaign.publicKey}`}>
         <div className="relative bg-card border border-border rounded-2xl overflow-hidden hover:border-hope/40 transition-all duration-300 hover:shadow-[0_0_60px_rgba(91,187,125,0.1)] h-full">
-          {/* Image placeholder */}
+          {/* Campaign image */}
           <div className="relative h-48 bg-gradient-to-br from-secondary to-muted overflow-hidden">
+            {imageUrl ? (
+              <img src={imageUrl} alt={campaign.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+            )}
             <div className="absolute inset-0 bg-hope/5 group-hover:bg-hope/10 transition-colors duration-300" />
             {campaign.featured && (
               <div className="absolute top-4 left-4 flex items-center gap-1.5 px-3 py-1 bg-hope text-black text-xs font-bold rounded-full">
@@ -147,10 +72,6 @@ function CampaignCard({ campaign }: { campaign: typeof campaigns[0] }) {
               <span className="px-3 py-1 bg-background/80 backdrop-blur-sm text-xs font-medium rounded-full border border-border">
                 {campaign.category}
               </span>
-            </div>
-            <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-            <div className="absolute bottom-4 right-4 font-display text-6xl font-bold text-white/5">
-              {String(campaign.id).padStart(2, '0')}
             </div>
           </div>
 
@@ -207,8 +128,47 @@ function CampaignCard({ campaign }: { campaign: typeof campaigns[0] }) {
 export default function ExplorePage() {
   const [activeCategory, setActiveCategory] = useState('All')
   const [searchQuery, setSearchQuery] = useState('')
+  const [blockchainCampaigns, setBlockchainCampaigns] = useState<DisplayCampaign[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const { fetchAllCampaigns } = useHopeRise()
 
-  const filteredCampaigns = campaigns.filter((campaign) => {
+  // Fetch campaigns from blockchain on mount
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const campaigns = await fetchAllCampaigns()
+        const now = Math.floor(Date.now() / 1000)
+
+        const displayCampaigns: DisplayCampaign[] = campaigns.map((c) => ({
+          id: c.publicKey.toString(),
+          title: c.title,
+          description: c.shortDescription,
+          raised: Math.round(c.amountRaised / LAMPORTS_PER_SOL * 100), // Convert to USD (approx)
+          goal: Math.round(c.fundingGoal / LAMPORTS_PER_SOL * 100),
+          backers: c.backerCount,
+          daysLeft: Math.max(0, Math.floor((c.deadline - now) / 86400)),
+          category: c.category,
+          creator: c.creator.toString().slice(0, 4) + '...' + c.creator.toString().slice(-4),
+          featured: c.amountRaised > c.fundingGoal * 0.5,
+          publicKey: c.publicKey.toString(),
+          coverImageUrl: c.coverImageUrl,
+        }))
+
+        setBlockchainCampaigns(displayCampaigns)
+      } catch (err) {
+        console.error('Failed to fetch blockchain campaigns:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadCampaigns()
+  }, [fetchAllCampaigns])
+
+  // Use only blockchain campaigns
+  const allCampaigns: DisplayCampaign[] = blockchainCampaigns
+
+  const filteredCampaigns = allCampaigns.filter((campaign) => {
     const matchesCategory = activeCategory === 'All' || campaign.category === activeCategory
     const matchesSearch = campaign.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       campaign.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -304,19 +264,26 @@ export default function ExplorePage() {
           </motion.div>
 
           {/* Campaign grid */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
-          >
-            {filteredCampaigns.map((campaign) => (
-              <CampaignCard key={campaign.id} campaign={campaign} />
-            ))}
-          </motion.div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 animate-spin text-hope" />
+              <span className="ml-3 text-muted-foreground">Loading campaigns...</span>
+            </div>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+            >
+              {filteredCampaigns.map((campaign) => (
+                <CampaignCard key={campaign.id} campaign={campaign} />
+              ))}
+            </motion.div>
+          )}
 
           {/* Empty state */}
-          {filteredCampaigns.length === 0 && (
+          {!isLoading && filteredCampaigns.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -325,11 +292,25 @@ export default function ExplorePage() {
               <div className="w-20 h-20 bg-secondary rounded-full flex items-center justify-center mx-auto mb-6">
                 <Search className="w-10 h-10 text-muted-foreground" />
               </div>
-              <h3 className="font-display text-2xl font-semibold mb-2">No campaigns found</h3>
-              <p className="text-muted-foreground mb-6">Try adjusting your search or filters</p>
-              <Button onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}>
-                Clear filters
-              </Button>
+              <h3 className="font-display text-2xl font-semibold mb-2">
+                {searchQuery || activeCategory !== 'All' ? 'No campaigns found' : 'No campaigns yet'}
+              </h3>
+              <p className="text-muted-foreground mb-6">
+                {searchQuery || activeCategory !== 'All'
+                  ? 'Try adjusting your search or filters'
+                  : 'Be the first to create a campaign on Fundra!'}
+              </p>
+              {searchQuery || activeCategory !== 'All' ? (
+                <Button onClick={() => { setActiveCategory('All'); setSearchQuery(''); }}>
+                  Clear filters
+                </Button>
+              ) : (
+                <Link href="/create">
+                  <Button className="bg-hope text-black hover:bg-hope/90">
+                    Create Campaign
+                  </Button>
+                </Link>
+              )}
             </motion.div>
           )}
 

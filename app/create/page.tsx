@@ -12,13 +12,18 @@ import {
   Sparkles,
   Check,
   Wallet,
-  AlertCircle
+  AlertCircle,
+  Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Navbar from '@/components/landing-page/Navbar'
-import { usePrivy } from '@privy-io/react-auth'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
+import { useHopeRise } from '@/lib/hooks/useHopeRise'
+import { uploadToIPFS } from '@/lib/ipfs'
 
 const categories = [
   { id: 'environment', label: 'Environment', icon: '🌱' },
@@ -37,8 +42,14 @@ const steps = [
 ]
 
 export default function CreateCampaignPage() {
-  const { login, authenticated, user } = usePrivy()
+  const { connected } = useWallet()
+  const { createCampaign, addMilestone: addMilestoneToChain, loading, error } = useHopeRise()
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
     shortDescription: '',
@@ -75,6 +86,33 @@ export default function CreateCampaignPage() {
     }))
   }
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return
+    }
+
+    // Create preview
+    setImagePreview(URL.createObjectURL(file))
+    updateFormData('coverImage', file)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+
+    setImagePreview(URL.createObjectURL(file))
+    updateFormData('coverImage', file)
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+  }
+
   const canProceed = () => {
     switch (currentStep) {
       case 1:
@@ -88,17 +126,64 @@ export default function CreateCampaignPage() {
     }
   }
 
-  const handleSubmit = () => {
-    if (!authenticated) {
-      login()
+  const handleSubmit = async () => {
+    if (!connected) {
       return
     }
-    // Handle campaign creation
-    console.log('Creating campaign:', formData)
+
+    setIsSubmitting(true)
+    setSubmitError(null)
+
+    try {
+      // Upload image to IPFS if provided
+      let coverImageUrl = 'ipfs://placeholder'
+      if (formData.coverImage) {
+        setIsUploadingImage(true)
+        try {
+          coverImageUrl = await uploadToIPFS(formData.coverImage)
+        } catch (err) {
+          console.error('Failed to upload image:', err)
+          // Continue with placeholder if upload fails
+        }
+        setIsUploadingImage(false)
+      }
+
+      // Create the campaign on-chain
+      const result = await createCampaign({
+        title: formData.title,
+        shortDescription: formData.shortDescription,
+        category: formData.category,
+        coverImageUrl,
+        storyUrl: `ipfs://${Buffer.from(formData.story).toString('base64').slice(0, 50)}`,
+        fundingGoalSol: Number(formData.fundingGoal) / 100, // Convert USD to approximate SOL (simplified)
+        durationDays: Number(formData.duration),
+      })
+
+      // Add milestones if any
+      const validMilestones = formData.milestones.filter(m => m.title && m.amount)
+      for (let i = 0; i < validMilestones.length; i++) {
+        const milestone = validMilestones[i]
+        await addMilestoneToChain(
+          result.campaignPda,
+          i,
+          milestone.title,
+          Number(milestone.amount) / 100 // Convert USD to approximate SOL
+        )
+      }
+
+      // Redirect to explore page after successful creation
+      router.push('/explore')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to create campaign'
+      setSubmitError(message)
+      console.error('Failed to create campaign:', err)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
-  // Require authentication
-  if (!authenticated) {
+  // Require wallet connection
+  if (!connected) {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
@@ -116,14 +201,9 @@ export default function CreateCampaignPage() {
                 Connect Your Wallet
               </h1>
               <p className="text-muted-foreground mb-6">
-                You need to connect your wallet to create a campaign on Hope Rise.
+                You need to connect your wallet to create a campaign on Fundra.
               </p>
-              <Button
-                onClick={() => login()}
-                className="w-full py-6 rounded-xl text-lg font-semibold bg-hope text-black hover:bg-hope/90"
-              >
-                Connect Wallet
-              </Button>
+              <WalletMultiButton className="!w-full !py-6 !rounded-xl !text-lg !font-semibold !bg-hope !text-black hover:!bg-hope/90 !justify-center" />
             </motion.div>
           </div>
         </div>
@@ -257,12 +337,35 @@ export default function CreateCampaignPage() {
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Cover Image</label>
-                  <div className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-hope/50 transition-colors cursor-pointer">
-                    <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
-                      <ImageIcon className="w-8 h-8 text-muted-foreground" />
-                    </div>
-                    <p className="font-medium mb-1">Drop your image here, or browse</p>
-                    <p className="text-sm text-muted-foreground">Recommended: 1200 x 675 pixels (16:9)</p>
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    className="relative border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-hope/50 transition-colors cursor-pointer overflow-hidden"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                    />
+                    {imagePreview ? (
+                      <div className="relative">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="max-h-48 mx-auto rounded-lg object-cover"
+                        />
+                        <p className="text-sm text-muted-foreground mt-3">Click or drop to replace</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="w-16 h-16 bg-secondary rounded-full flex items-center justify-center mx-auto mb-4">
+                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                        <p className="font-medium mb-1">Drop your image here, or click to browse</p>
+                        <p className="text-sm text-muted-foreground">Recommended: 1200 x 675 pixels (16:9)</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -453,6 +556,18 @@ export default function CreateCampaignPage() {
                     By launching this campaign, you agree to our Terms of Service and confirm that all information provided is accurate.
                   </p>
                 </div>
+
+                {submitError && (
+                  <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-xl">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="w-5 h-5 text-destructive mt-0.5" />
+                      <div>
+                        <p className="font-medium text-sm text-destructive">Error creating campaign</p>
+                        <p className="text-sm text-destructive/80 mt-1">{submitError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>
@@ -486,10 +601,20 @@ export default function CreateCampaignPage() {
             ) : (
               <Button
                 onClick={handleSubmit}
+                disabled={isSubmitting}
                 className="rounded-xl bg-hope text-black hover:bg-hope/90 glow-hope"
               >
-                Launch Campaign
-                <Sparkles className="w-4 h-4 ml-2" />
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    {isUploadingImage ? 'Uploading Image...' : 'Creating Campaign...'}
+                  </>
+                ) : (
+                  <>
+                    Launch Campaign
+                    <Sparkles className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
             )}
           </motion.div>

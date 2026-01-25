@@ -2,10 +2,11 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { usePrivy } from '@privy-io/react-auth'
+import { useWallet } from '@solana/wallet-adapter-react'
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { useTheme } from 'next-themes'
 import Link from 'next/link'
-import { Menu, X, Mail, LogOut, Sun, Moon } from 'lucide-react'
+import { Menu, X, LogOut, Sun, Moon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 const navLinks = [
@@ -63,13 +64,22 @@ function ThemeToggle() {
 }
 
 export default function Navbar() {
-  const { login, logout, authenticated, user } = usePrivy()
+  const { publicKey, disconnect, connected } = useWallet()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-  const walletAddress = user?.wallet?.address
+  const walletAddress = publicKey?.toBase58()
   const shortenedAddress = walletAddress
     ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
     : null
+
+  const copyAddress = async () => {
+    if (walletAddress) {
+      await navigator.clipboard.writeText(walletAddress)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
 
   return (
     <motion.header
@@ -111,32 +121,32 @@ export default function Navbar() {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {authenticated ? (
+          {connected ? (
             <div className="flex items-center gap-3">
               {/* Wallet address */}
-              <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-full">
+              <button
+                onClick={copyAddress}
+                className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-full hover:bg-secondary/80 transition-colors cursor-pointer"
+                title="Click to copy address"
+              >
                 <div className="w-2 h-2 bg-hope rounded-full" />
-                <span className="text-sm font-mono">{shortenedAddress}</span>
-              </div>
+                <span className="text-sm font-mono">
+                  {copied ? 'Copied!' : shortenedAddress}
+                </span>
+              </button>
 
-              {/* Logout button */}
+              {/* Disconnect button */}
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => logout()}
+                onClick={() => disconnect()}
                 className="rounded-full hover:bg-destructive/10 hover:text-destructive"
               >
                 <LogOut className="w-4 h-4" />
               </Button>
             </div>
           ) : (
-            <Button
-              onClick={() => login()}
-              className="rounded-full px-6 bg-hope text-white hover:bg-hope/90 font-semibold"
-            >
-              <Mail className="w-4 h-4 mr-2" />
-              Sign In
-            </Button>
+            <WalletMultiButton className="!bg-hope !text-white hover:!bg-hope/90 !rounded-full !px-6 !font-semibold !h-10" />
           )}
         </div>
 
@@ -179,15 +189,21 @@ export default function Navbar() {
               ))}
 
               <div className="pt-4 border-t border-border">
-                {authenticated ? (
+                {connected ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-xl">
+                    <button
+                      onClick={copyAddress}
+                      className="flex items-center gap-2 px-4 py-2 bg-secondary rounded-xl hover:bg-secondary/80 transition-colors cursor-pointer w-full"
+                      title="Click to copy address"
+                    >
                       <div className="w-2 h-2 bg-hope rounded-full" />
-                      <span className="text-sm font-mono">{shortenedAddress}</span>
-                    </div>
+                      <span className="text-sm font-mono">
+                        {copied ? 'Copied!' : shortenedAddress}
+                      </span>
+                    </button>
                     <Button
                       variant="outline"
-                      onClick={() => { logout(); setMobileMenuOpen(false); }}
+                      onClick={() => { disconnect(); setMobileMenuOpen(false); }}
                       className="w-full rounded-xl"
                     >
                       <LogOut className="w-4 h-4 mr-2" />
@@ -195,13 +211,9 @@ export default function Navbar() {
                     </Button>
                   </div>
                 ) : (
-                  <Button
-                    onClick={() => { login(); setMobileMenuOpen(false); }}
-                    className="w-full rounded-xl bg-hope text-white hover:bg-hope/90"
-                  >
-                    <Mail className="w-4 h-4 mr-2" />
-                    Sign In
-                  </Button>
+                  <div className="w-full">
+                    <WalletMultiButton className="!bg-hope !text-white hover:!bg-hope/90 !rounded-xl !w-full !justify-center" />
+                  </div>
                 )}
               </div>
             </div>

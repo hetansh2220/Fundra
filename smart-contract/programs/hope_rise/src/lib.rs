@@ -1,0 +1,453 @@
+use anchor_lang::prelude::*;
+use anchor_lang::system_program;
+
+mod constants;
+mod errors;
+mod state;
+
+use constants::*;
+use errors::HopeRiseError;
+use state::*;
+
+declare_id!("8zeHBfNfVkHQcWpJH9HRnR8NoEfrW6zSGqmZvBMWeCkd");
+
+#[program]
+pub mod hope_rise {
+    use super::*;
+
+    /// Initialize the global campaign counter (one-time setup)
+    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+        let counter = &mut ctx.accounts.campaign_counter;
+        counter.count = 0;
+        counter.authority = ctx.accounts.authority.key();
+        counter.bump = ctx.bumps.campaign_counter;
+        Ok(())
+    }
+
+    /// Create a new crowdfunding campaign
+    pub fn create_campaign(
+        ctx: Context<CreateCampaign>,
+        title: String,
+        short_description: String,
+        category: Category,
+        cover_image_url: String,
+        story_url: String,
+        funding_goal: u64,
+        duration_days: u64,
+    ) -> Result<()> {
+        // Validate inputs
+        require!(title.len() <= MAX_TITLE_LENGTH, HopeRiseError::TitleTooLong);
+        require!(
+            short_description.len() <= MAX_DESCRIPTION_LENGTH,
+            HopeRiseError::DescriptionTooLong
+        );
+        require!(
+            cover_image_url.len() <= MAX_URL_LENGTH,
+            HopeRiseError::UrlTooLong
+        );
+        require!(story_url.len() <= MAX_URL_LENGTH, HopeRiseError::UrlTooLong);
+        require!(funding_goal > 0, HopeRiseError::InvalidFundingGoal);
+        require!(
+            duration_days >= MIN_CAMPAIGN_DURATION_DAYS
+                && duration_days <= MAX_CAMPAIGN_DURATION_DAYS,
+            HopeRiseError::InvalidDuration
+        );
+
+        let clock = Clock::get()?;
+        let counter = &mut ctx.accounts.campaign_counter;
+        let campaign = &mut ctx.accounts.campaign;
+
+        // Set campaign data
+        campaign.campaign_id = counter.count;
+        campaign.creator = ctx.accounts.creator.key();
+        campaign.title = title;
+        campaign.short_description = short_description;
+        campaign.category = category;
+        campaign.cover_image_url = cover_image_url;
+        campaign.story_url = story_url;
+        campaign.funding_goal = funding_goal;
+        campaign.deadline = clock
+            .unix_timestamp
+            .checked_add(duration_days as i64 * SECONDS_PER_DAY)
+            .ok_or(HopeRiseError::ArithmeticOverflow)?;
+        campaign.amount_raised = 0;
+        campaign.backer_count = 0;
+        campaign.is_active = true;
+        campaign.created_at = clock.unix_timestamp;
+        campaign.milestone_count = 0;
+        campaign.bump = ctx.bumps.campaign;
+
+        // Increment global counter
+        counter.count = counter
+            .count
+            .checked_add(1)
+            .ok_or(HopeRiseError::ArithmeticOverflow)?;
+
+        Ok(())
+    }
+
+    /// Contribute SOL to a campaign
+    pub fn fund_campaign(ctx: Context<FundCampaign>, amount: u64) -> Result<()> {
+        require!(amount > 0, HopeRiseError::InvalidContributionAmount);
+
+        let campaign = &ctx.accounts.campaign;
+        let clock = Clock::get()?;
+
+        // Validate campaign state
+        require!(campaign.is_active, HopeRiseError::CampaignNotActive);
+        require!(
+            clock.unix_timestamp < campaign.deadline,
+            HopeRiseError::CampaignEnded
+        );
+
+        // Transfer SOL from contributor to campaign PDA
+        let cpi_context = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            system_program::Transfer {
+                from: ctx.accounts.contributor.to_account_info(),
+                to: ctx.accounts.campaign.to_account_info(),
+            },
+        );
+        system_program::transfer(cpi_context, amount)?;
+
+        // Update campaign state
+        let campaign = &mut ctx.accounts.campaign;
+        let contribution = &mut ctx.accounts.contribution;
+
+        // Check if this is a new backer
+        if contribution.amount == 0 {
+            campaign.backer_count = campaign
+                .backer_count
+                .checked_add(1)
+                .ok_or(HopeRiseError::ArithmeticOverflow)?;
+
+            // Initialize contribution account
+            contribution.campaign = campaign.key();
+            contribution.contributor = ctx.accounts.contributor.key();
+            contribution.contributed_at = clock.unix_timestamp;
+            contribution.refund_claimed = false;
+            contribution.bump = ctx.bumps.contribution;
+        }
+
+        // Update amounts
+        campaign.amount_raised = campaign
+            .amount_raised
+            .checked_add(amount)
+            .ok_or(HopeRiseError::ArithmeticOverflow)?;
+
+        contribution.amount = contribution
+            .amount
+            .checked_add(amount)
+            .ok_or(HopeRiseError::ArithmeticOverflow)?;
+
+        Ok(())
+    }
+
+    /// Withdraw funds (creator only, after goal met)
+    pub fn withdraw_funds(ctx: Context<WithdrawFunds>) -> Result<()> {
+        let campaign = &ctx.accounts.campaign;
+        let clock = Clock::get()?;
+
+        // Only allow withdrawal if goal is met
+        require!(
+            campaign.amount_raised >= campaign.funding_goal,
+            HopeRiseError::GoalNotMet
+        );
+
+        // Calculate withdrawable amount (campaign balance minus rent)
+        let campaign_info = ctx.accounts.campaign.to_account_info();
+        let rent = Rent::get()?;
+        let min_balance = rent.minimum_balance(campaign_info.data_len());
+        let campaign_lamports = campaign_info.lamports();
+
+        let withdrawable = campaign_lamports
+            .checked_sub(min_balance)
+            .ok_or(HopeRiseError::InsufficientFunds)?;
+
+        require!(withdrawable > 0, HopeRiseError::InsufficientFunds);
+
+        // Transfer from campaign PDA to creator
+        **ctx
+            .accounts
+            .campaign
+            .to_account_info()
+            .try_borrow_mut_lamports()? -= withdrawable;
+        **ctx
+            .accounts
+            .creator
+            .to_account_info()
+            .try_borrow_mut_lamports()? += withdrawable;
+
+        Ok(())
+    }
+
+    /// Add a milestone to a campaign
+    pub fn add_milestone(
+        ctx: Context<AddMilestone>,
+        title: String,
+        target_amount: u64,
+    ) -> Result<()> {
+        require!(
+            title.len() <= MAX_MILESTONE_TITLE_LENGTH,
+            HopeRiseError::MilestoneTitleTooLong
+        );
+
+        let campaign = &mut ctx.accounts.campaign;
+        let milestone = &mut ctx.accounts.milestone;
+
+        // Set milestone data
+        milestone.campaign = campaign.key();
+        milestone.milestone_index = campaign.milestone_count;
+        milestone.title = title;
+        milestone.target_amount = target_amount;
+        milestone.is_completed = false;
+        milestone.bump = ctx.bumps.milestone;
+
+        // Increment milestone count
+        campaign.milestone_count = campaign
+            .milestone_count
+            .checked_add(1)
+            .ok_or(HopeRiseError::ArithmeticOverflow)?;
+
+        Ok(())
+    }
+
+    /// Mark a milestone as complete
+    pub fn complete_milestone(ctx: Context<CompleteMilestone>) -> Result<()> {
+        let campaign = &ctx.accounts.campaign;
+        let milestone = &mut ctx.accounts.milestone;
+
+        // Verify milestone can be completed
+        require!(
+            !milestone.is_completed,
+            HopeRiseError::MilestoneAlreadyCompleted
+        );
+        require!(
+            campaign.amount_raised >= milestone.target_amount,
+            HopeRiseError::MilestoneTargetNotReached
+        );
+
+        milestone.is_completed = true;
+
+        Ok(())
+    }
+
+    /// Close a campaign
+    pub fn close_campaign(ctx: Context<CloseCampaign>) -> Result<()> {
+        let campaign = &mut ctx.accounts.campaign;
+
+        require!(campaign.is_active, HopeRiseError::CampaignNotActive);
+
+        campaign.is_active = false;
+
+        Ok(())
+    }
+
+    /// Claim refund if campaign failed (goal not met)
+    pub fn claim_refund(ctx: Context<ClaimRefund>) -> Result<()> {
+        let campaign = &ctx.accounts.campaign;
+        let contribution = &ctx.accounts.contribution;
+
+        // Verify refund conditions
+        require!(!campaign.is_active, HopeRiseError::CampaignStillActive);
+        require!(
+            campaign.amount_raised < campaign.funding_goal,
+            HopeRiseError::GoalWasMet
+        );
+        require!(
+            !contribution.refund_claimed,
+            HopeRiseError::RefundAlreadyClaimed
+        );
+        require!(contribution.amount > 0, HopeRiseError::NoContribution);
+
+        let refund_amount = contribution.amount;
+
+        // Transfer refund from campaign PDA to contributor
+        **ctx
+            .accounts
+            .campaign
+            .to_account_info()
+            .try_borrow_mut_lamports()? -= refund_amount;
+        **ctx
+            .accounts
+            .contributor
+            .to_account_info()
+            .try_borrow_mut_lamports()? += refund_amount;
+
+        // Mark refund as claimed
+        let contribution = &mut ctx.accounts.contribution;
+        contribution.refund_claimed = true;
+
+        Ok(())
+    }
+}
+
+// ============================================================================
+// Account Contexts
+// ============================================================================
+
+#[derive(Accounts)]
+pub struct Initialize<'info> {
+    #[account(
+        init,
+        payer = authority,
+        space = CampaignCounter::SIZE,
+        seeds = [CAMPAIGN_COUNTER_SEED],
+        bump
+    )]
+    pub campaign_counter: Account<'info, CampaignCounter>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CreateCampaign<'info> {
+    #[account(
+        init,
+        payer = creator,
+        space = Campaign::SIZE,
+        seeds = [CAMPAIGN_SEED, creator.key().as_ref(), campaign_counter.count.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_COUNTER_SEED],
+        bump = campaign_counter.bump
+    )]
+    pub campaign_counter: Account<'info, CampaignCounter>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FundCampaign<'info> {
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(
+        init_if_needed,
+        payer = contributor,
+        space = Contribution::SIZE,
+        seeds = [CONTRIBUTION_SEED, campaign.key().as_ref(), contributor.key().as_ref()],
+        bump
+    )]
+    pub contribution: Account<'info, Contribution>,
+
+    #[account(mut)]
+    pub contributor: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawFunds<'info> {
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump,
+        has_one = creator @ HopeRiseError::Unauthorized
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct AddMilestone<'info> {
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump,
+        has_one = creator @ HopeRiseError::Unauthorized,
+        constraint = campaign.is_active @ HopeRiseError::CampaignNotActive,
+        constraint = campaign.milestone_count < MAX_MILESTONES_PER_CAMPAIGN @ HopeRiseError::MaxMilestonesReached
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(
+        init,
+        payer = creator,
+        space = Milestone::SIZE,
+        seeds = [MILESTONE_SEED, campaign.key().as_ref(), &[campaign.milestone_count]],
+        bump
+    )]
+    pub milestone: Account<'info, Milestone>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction()]
+pub struct CompleteMilestone<'info> {
+    #[account(
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump,
+        has_one = creator @ HopeRiseError::Unauthorized
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(
+        mut,
+        seeds = [MILESTONE_SEED, campaign.key().as_ref(), &[milestone.milestone_index]],
+        bump = milestone.bump,
+        constraint = milestone.campaign == campaign.key() @ HopeRiseError::Unauthorized
+    )]
+    pub milestone: Account<'info, Milestone>,
+
+    pub creator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct CloseCampaign<'info> {
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump,
+        has_one = creator @ HopeRiseError::Unauthorized
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(mut)]
+    pub creator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimRefund<'info> {
+    #[account(
+        mut,
+        seeds = [CAMPAIGN_SEED, campaign.creator.as_ref(), campaign.campaign_id.to_le_bytes().as_ref()],
+        bump = campaign.bump
+    )]
+    pub campaign: Account<'info, Campaign>,
+
+    #[account(
+        mut,
+        seeds = [CONTRIBUTION_SEED, campaign.key().as_ref(), contributor.key().as_ref()],
+        bump = contribution.bump,
+        constraint = contribution.contributor == contributor.key() @ HopeRiseError::Unauthorized
+    )]
+    pub contribution: Account<'info, Contribution>,
+
+    #[account(mut)]
+    pub contributor: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}

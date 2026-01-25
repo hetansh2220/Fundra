@@ -1,45 +1,26 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { ArrowUpRight, Users, Clock } from 'lucide-react'
+import { ArrowUpRight, Users, Clock, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { useState, useEffect } from 'react'
+import { useHopeRise, type Campaign } from '@/lib/hooks/useHopeRise'
+import { LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { ipfsToHttp } from '@/lib/ipfs'
 
-const campaigns = [
-  {
-    id: 1,
-    title: 'Solar-Powered Water Purification',
-    description: 'Bringing clean drinking water to rural communities using sustainable solar technology.',
-    image: '/campaign-1.jpg',
-    raised: 45000,
-    goal: 60000,
-    backers: 892,
-    daysLeft: 12,
-    category: 'Environment',
-  },
-  {
-    id: 2,
-    title: 'Open Source Education Platform',
-    description: 'Building a free, decentralized learning platform accessible to students worldwide.',
-    image: '/campaign-2.jpg',
-    raised: 28500,
-    goal: 40000,
-    backers: 456,
-    daysLeft: 21,
-    category: 'Education',
-  },
-  {
-    id: 3,
-    title: 'Community Health Clinic',
-    description: 'Establishing a mobile health clinic for underserved neighborhoods in urban areas.',
-    image: '/campaign-3.jpg',
-    raised: 72000,
-    goal: 85000,
-    backers: 1203,
-    daysLeft: 5,
-    category: 'Healthcare',
-  },
-]
+interface DisplayCampaign {
+  id: string
+  title: string
+  description: string
+  raised: number
+  goal: number
+  backers: number
+  daysLeft: number
+  category: string
+  publicKey: string
+  coverImageUrl?: string
+}
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -57,11 +38,47 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
   },
 }
 
 export default function Campaigns() {
+  const { fetchAllCampaigns } = useHopeRise()
+  const [campaigns, setCampaigns] = useState<DisplayCampaign[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const loadCampaigns = async () => {
+      try {
+        const blockchainCampaigns = await fetchAllCampaigns()
+        const now = Math.floor(Date.now() / 1000)
+
+        const displayCampaigns: DisplayCampaign[] = blockchainCampaigns
+          .slice(0, 3) // Show top 3 campaigns
+          .map((c) => ({
+            id: c.publicKey.toString(),
+            title: c.title,
+            description: c.shortDescription,
+            raised: c.amountRaised / LAMPORTS_PER_SOL,
+            goal: c.fundingGoal / LAMPORTS_PER_SOL,
+            backers: c.backerCount,
+            daysLeft: Math.max(0, Math.floor((c.deadline - now) / 86400)),
+            category: c.category,
+            publicKey: c.publicKey.toString(),
+            coverImageUrl: c.coverImageUrl,
+          }))
+
+        setCampaigns(displayCampaigns)
+      } catch (err) {
+        console.error('Failed to fetch campaigns:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    loadCampaigns()
+  }, [fetchAllCampaigns])
+
   return (
     <section className="relative py-32 px-6 overflow-hidden">
       {/* Background */}
@@ -99,84 +116,116 @@ export default function Campaigns() {
           </Link>
         </motion.div>
 
+        {/* Loading state */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="w-8 h-8 animate-spin text-hope" />
+            <span className="ml-3 text-muted-foreground">Loading campaigns...</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoading && campaigns.length === 0 && (
+          <motion.div variants={itemVariants} className="text-center py-16">
+            <p className="text-muted-foreground mb-4">No campaigns yet. Be the first to create one!</p>
+            <Link href="/create">
+              <Button className="bg-hope text-black hover:bg-hope/90">
+                Create Campaign
+              </Button>
+            </Link>
+          </motion.div>
+        )}
+
         {/* Campaigns grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {campaigns.map((campaign) => {
-            const progress = (campaign.raised / campaign.goal) * 100
+        {!isLoading && campaigns.length > 0 && (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {campaigns.map((campaign, index) => {
+              const progress = (campaign.raised / campaign.goal) * 100
+              const imageUrl = campaign.coverImageUrl ? ipfsToHttp(campaign.coverImageUrl) : ''
 
-            return (
-              <motion.div
-                key={campaign.id}
-                variants={itemVariants}
-                whileHover={{ y: -8 }}
-                className="group"
-              >
-                <Link href={`/campaigns/${campaign.id}`} className="block">
-                <div className="relative bg-card border border-border rounded-2xl overflow-hidden hover:border-hope/40 transition-all duration-300 hover:shadow-[0_0_60px_rgba(91,187,125,0.1)] cursor-pointer">
-                  {/* Image placeholder */}
-                  <div className="relative h-52 bg-gradient-to-br from-secondary to-muted overflow-hidden">
-                    <div className="absolute inset-0 bg-hope/5 group-hover:bg-hope/10 transition-colors duration-300" />
-                    {/* Category badge */}
-                    <div className="absolute top-4 left-4">
-                      <span className="px-3 py-1 bg-background/80 backdrop-blur-sm text-xs font-medium rounded-full border border-border">
-                        {campaign.category}
-                      </span>
-                    </div>
-                    {/* Decorative pattern */}
-                    <div className="absolute inset-0 bg-grid-pattern opacity-20" />
-                    <div className="absolute bottom-4 right-4 font-display text-6xl font-bold text-white/5">
-                      {String(campaign.id).padStart(2, '0')}
-                    </div>
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6">
-                    <h3 className="font-display text-xl font-semibold mb-2 group-hover:text-hope transition-colors duration-300 line-clamp-1">
-                      {campaign.title}
-                    </h3>
-                    <p className="text-muted-foreground text-sm mb-6 line-clamp-2">
-                      {campaign.description}
-                    </p>
-
-                    {/* Progress bar */}
-                    <div className="mb-4">
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="font-semibold text-hope">
-                          ${campaign.raised.toLocaleString()}
-                        </span>
-                        <span className="text-muted-foreground">
-                          of ${campaign.goal.toLocaleString()}
+              return (
+                <motion.div
+                  key={campaign.id}
+                  variants={itemVariants}
+                  whileHover={{ y: -8 }}
+                  className="group"
+                >
+                  <Link href={`/campaigns/${campaign.publicKey}`} className="block">
+                  <div className="relative bg-card border border-border rounded-2xl overflow-hidden hover:border-hope/40 transition-all duration-300 hover:shadow-[0_0_60px_rgba(91,187,125,0.1)] cursor-pointer">
+                    {/* Image */}
+                    <div className="relative h-52 bg-gradient-to-br from-secondary to-muted overflow-hidden">
+                      {imageUrl ? (
+                        <img src={imageUrl} alt={campaign.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+                      )}
+                      <div className="absolute inset-0 bg-hope/5 group-hover:bg-hope/10 transition-colors duration-300" />
+                      {/* Category badge */}
+                      <div className="absolute top-4 left-4">
+                        <span className="px-3 py-1 bg-background/80 backdrop-blur-sm text-xs font-medium rounded-full border border-border">
+                          {campaign.category}
                         </span>
                       </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          whileInView={{ width: `${progress}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-                          className="h-full bg-gradient-to-r from-hope to-emerald-400 rounded-full"
-                        />
+                      {/* On-chain badge */}
+                      <div className="absolute top-4 right-4">
+                        <span className="px-3 py-1 bg-hope/90 text-black text-xs font-bold rounded-full">
+                          On-Chain
+                        </span>
+                      </div>
+                      <div className="absolute bottom-4 right-4 font-display text-6xl font-bold text-white/5">
+                        {String(index + 1).padStart(2, '0')}
                       </div>
                     </div>
 
-                    {/* Meta info */}
-                    <div className="flex items-center justify-between text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1.5">
-                        <Users className="w-4 h-4" />
-                        <span>{campaign.backers} backers</span>
+                    {/* Content */}
+                    <div className="p-6">
+                      <h3 className="font-display text-xl font-semibold mb-2 group-hover:text-hope transition-colors duration-300 line-clamp-1">
+                        {campaign.title}
+                      </h3>
+                      <p className="text-muted-foreground text-sm mb-6 line-clamp-2">
+                        {campaign.description}
+                      </p>
+
+                      {/* Progress bar */}
+                      <div className="mb-4">
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="font-semibold text-hope">
+                            {campaign.raised.toFixed(2)} SOL
+                          </span>
+                          <span className="text-muted-foreground">
+                            of {campaign.goal.toFixed(2)} SOL
+                          </span>
+                        </div>
+                        <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                          <motion.div
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${Math.min(progress, 100)}%` }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
+                            className="h-full bg-gradient-to-r from-hope to-emerald-400 rounded-full"
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-4 h-4" />
-                        <span>{campaign.daysLeft} days left</span>
+
+                      {/* Meta info */}
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1.5">
+                          <Users className="w-4 h-4" />
+                          <span>{campaign.backers} backers</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-4 h-4" />
+                          <span>{campaign.daysLeft} days left</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                </Link>
-              </motion.div>
-            )
-          })}
-        </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
       </motion.div>
     </section>
   )
