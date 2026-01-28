@@ -442,7 +442,7 @@ export default function CampaignDetailPage() {
                       type="number"
                       placeholder=" custom amount"
                       value={customAmount}
-                      onChange={(e) => { setCusteomAmount(e.target.value); setSelectedTier(null); }}
+                      onChange={(e) => { setCustomAmount(e.target.value); setSelectedTier(null); }}
                       className="w-full pl-16 pr-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-hope/50"
                     />
                   </div>
