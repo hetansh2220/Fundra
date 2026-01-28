@@ -219,7 +219,7 @@ export default function CampaignDetailPage() {
       <div className="pt-24 px-6">
         <div className="max-w-7xl mx-auto">
           <Link href="/explore">
-            <Button variant="ghost" className="mb-6 -ml-2 text-muted-foreground hover:text-foreground">
+            <Button variant="link" className="mb-6 -ml-2 text-muted-foreground ">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Explore
             </Button>
@@ -290,11 +290,10 @@ export default function CampaignDetailPage() {
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                        activeTab === tab
+                      className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === tab
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
-                      }`}
+                        }`}
                     >
                       {tab.charAt(0).toUpperCase() + tab.slice(1)}
                       {tab === 'updates' && campaign.updates.length > 0 && (
@@ -423,11 +422,10 @@ export default function CampaignDetailPage() {
                       <button
                         key={tier.amount}
                         onClick={() => { setSelectedTier(tier.amount); setCustomAmount(''); }}
-                        className={`p-3 rounded-xl border text-left transition-all ${
-                          selectedTier === tier.amount
+                        className={`p-3 rounded-xl border text-left transition-all ${selectedTier === tier.amount
                             ? 'border-hope bg-hope/10'
                             : 'border-border hover:border-hope/50'
-                        }`}
+                          }`}
                       >
                         <p className="font-semibold">{tier.amount} USDC</p>
                         <p className="text-xs text-muted-foreground">{tier.label}</p>
@@ -442,10 +440,10 @@ export default function CampaignDetailPage() {
                     </span>
                     <input
                       type="number"
-                      placeholder="Custom amount"
+                      placeholder=" custom amount"
                       value={customAmount}
-                      onChange={(e) => { setCustomAmount(e.target.value); setSelectedTier(null); }}
-                      className="w-full pl-14 pr-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-hope/50"
+                      onChange={(e) => { setCusteomAmount(e.target.value); setSelectedTier(null); }}
+                      className="w-full pl-16 pr-4 py-3 bg-secondary border border-border rounded-xl text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-hope/50"
                     />
                   </div>
                 </div>
@@ -484,9 +482,8 @@ export default function CampaignDetailPage() {
                     <div className="space-y-3">
                       {campaign.milestones.map((milestone, i) => (
                         <div key={i} className="flex items-center gap-3">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            milestone.completed ? 'bg-hope/20' : 'bg-secondary'
-                          }`}>
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${milestone.completed ? 'bg-hope/20' : 'bg-secondary'
+                            }`}>
                             {milestone.completed ? (
                               <CheckCircle2 className="w-4 h-4 text-hope" />
                             ) : (
